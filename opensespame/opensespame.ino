@@ -9,10 +9,30 @@
 /**************************************************************************/
 #include <SPI.h>
 #include <Adafruit_PN532.h>
+#include <ESP8266WiFi.h>
+#include <PubSubClient.h>
 
 extern "C" {
 #include "user_interface.h"
 }
+
+// Function definitions:
+extern String checkNFC();
+extern String hexlify(uint8_t byte);
+extern void determineCurrentState();
+extern bool isDoorClosed();
+extern bool isValidID(String nfcID);
+extern void lockDoor();
+extern void unlockDoor();
+extern void startUnlockTimeout();
+extern void restartUnlockTimeout();
+extern void unlockTimeoutCallback(void *pArg);
+extern void startRelockTimeout();
+extern void restartRelockTimeout();
+extern void relockTimeoutCallback(void *pArg);
+extern void doorChanged();
+extern void doorOpened();
+extern void doorClosed();
 
 // Connect to the PN532 using a hardware SPI connection. 
 // Pins need to be connected as follows:
