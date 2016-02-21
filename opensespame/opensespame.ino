@@ -64,7 +64,11 @@ void setup(void) {
 }
 
 void loop(void) {
-  String nfcID = checkNFC();
+  if (currentState == DOOR_CLOSED_AND_LOCKED) {
+    String nfcID = checkNFC();
+  } else if (currentState == DOOR_CLOSED_AND_UNLOCKED){
+    String nfcID = checkNFC();
+  }
   // Wait 1 second before continuing
   delay(1000);
 }
