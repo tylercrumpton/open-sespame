@@ -66,6 +66,11 @@ void setup(void) {
 void loop(void) {
   if (currentState == DOOR_CLOSED_AND_LOCKED) {
     String nfcID = checkNFC();
+    if (isValidID(nfcID)) {
+      unlockDoor();
+      startUnlockTimeout();
+      currentState = DOOR_CLOSED_AND_UNLOCKED;
+    }
   } else if (currentState == DOOR_CLOSED_AND_UNLOCKED){
     String nfcID = checkNFC();
   }
@@ -129,11 +134,23 @@ bool isDoorClosed() {
   return true;
 }
 
+bool isValidID(String nfcID) {
+  bool isValid = false;
+  if (nfcID != "") {
+    isValid = true;
+  }
+  return isValid;
+}
+
 void lockDoor() {
 
 }
 
 void unlockDoor() {
+
+}
+
+void startUnlockTimeout() {
 
 }
 
