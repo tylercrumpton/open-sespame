@@ -35,7 +35,7 @@ doorStates currentState = UNKNOWN;
 
 void setup(void) {
   Serial.begin(115200);
-  Serial.println("Hello!");
+  Serial.println("Booting open-sespame...");
 
   nfc.begin();
 
