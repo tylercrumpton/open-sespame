@@ -62,9 +62,14 @@ void setup(void) {
 }
 
 void loop(void) {
+  String nfcID = checkNFC();
+}
+
+String checkNFC() {
   boolean success;
-  uint8_t uid[] = { 0, 0, 0, 0, 0, 0, 0 };	// Buffer to store the returned UID
-  uint8_t uidLength;				// Length of the UID (4 or 7 bytes depending on ISO14443A card type)
+  uint8_t uid[] = { 0, 0, 0, 0, 0, 0, 0 };   // Buffer to store the returned UID
+  uint8_t uidLength;                         // Length of the UID (4 or 7 bytes depending on ISO14443A card type)
+  String strUID = "";
   
   // Wait for an ISO14443A type cards (Mifare, etc.).  When one is found
   // 'uid' will be populated with the UID, and uidLength will indicate
@@ -78,14 +83,29 @@ void loop(void) {
     for (uint8_t i=0; i < uidLength; i++) 
     {
       Serial.print(" 0x");Serial.print(uid[i], HEX); 
+      strUID += hexlify(uid[i]);
     }
     Serial.println("");
-	// Wait 1 second before continuing
-	delay(1000);
+    // Wait 1 second before continuing
+    delay(1000);
   }
   else
   {
     // PN532 probably timed out waiting for a card
     Serial.println("Timed out waiting for a card");
   }
+  return strUID;
 }
+
+String hexlify(uint8_t byte) {
+  // Conver the integer to a string with the hex value:
+  String hexedString = String(byte, HEX);
+
+  // Add prepended '0' if needed:
+  if (hexedString.length() == 1) {
+    hexedString = "0" + hexedString;
+  }
+
+  return hexedString;
+}
+
