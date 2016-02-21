@@ -46,6 +46,10 @@ void setup(void) {
 
   determineCurrentState();
 
+  // Enable GPIO interrupts:
+  pinMode(D3, INPUT);
+  attachInterrupt(D3, doorChanged, CHANGE);
+
   nfc.begin();
 
   uint32_t versiondata = nfc.getFirmwareVersion();
@@ -178,5 +182,50 @@ void unlockTimeoutCallback(void *pArg) {
   Serial.println("Door unlock timeout elapsed.");
   lockDoor();
   currentState = DOOR_CLOSED_AND_LOCKED;
+}
+
+void startRelockTimeout() {
+  os_timer_setfn(&timer, relockTimeoutCallback, NULL);
+  os_timer_arm(&timer, 10000, false);
+  Serial.println("Door relock timer started.");
+}
+
+void restartRelockTimeout() {
+  os_timer_disarm(&timer);
+  os_timer_arm(&timer, 10000, false);
+  Serial.println("Door relock timer restarted.");
+}
+
+void relockTimeoutCallback(void *pArg) {
+  Serial.println("Door relock timeout elapsed.");
+  lockDoor();
+  currentState = DOOR_CLOSED_AND_LOCKED;
+}
+
+void doorChanged() {
+  bool status = digitalRead(D3);
+  if (status) {
+    doorClosed();
+  } else {
+    doorOpened();
+  }
+}
+
+void doorOpened() {
+  Serial.println("Door opened");
+  if (currentState == DOOR_CLOSED_AND_UNLOCKED) {
+    os_timer_disarm(&timer);
+    currentState = DOOR_OPEN_AND_UNLOCKED;
+  } else if (currentState == DOOR_RECLOSED_AND_UNLOCKED) {
+    restartRelockTimeout();
+  }
+}
+
+void doorClosed() {
+  Serial.println("Door closed");
+  if (currentState == DOOR_OPEN_AND_UNLOCKED) {
+    currentState = DOOR_RECLOSED_AND_UNLOCKED;
+    startRelockTimeout();
+  }
 }
 
