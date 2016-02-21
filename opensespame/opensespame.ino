@@ -42,7 +42,7 @@ void setup(void) {
   // Set the max number of retry attempts to read from a card
   // This prevents us from waiting forever for a card, which is
   // the default behaviour of the PN532.
-  nfc.setPassiveActivationRetries(0xFF);
+  nfc.setPassiveActivationRetries(0xFE);
   
   // configure board to read RFID tags
   nfc.SAMConfig();
