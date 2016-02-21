@@ -63,6 +63,8 @@ void setup(void) {
 
 void loop(void) {
   String nfcID = checkNFC();
+  // Wait 1 second before continuing
+  delay(1000);
 }
 
 String checkNFC() {
@@ -86,8 +88,6 @@ String checkNFC() {
       strUID += hexlify(uid[i]);
     }
     Serial.println("");
-    // Wait 1 second before continuing
-    delay(1000);
   }
   else
   {
