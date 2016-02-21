@@ -10,6 +10,10 @@
 #include <SPI.h>
 #include <Adafruit_PN532.h>
 
+extern "C" {
+#include "user_interface.h"
+}
+
 // Connect to the PN532 using a hardware SPI connection. 
 // Pins need to be connected as follows:
 //  PN532 <---> NodeMCU
@@ -32,6 +36,9 @@ enum doorStates {
 };
 
 doorStates currentState = UNKNOWN;
+
+// Define a timer to use for timeouts:
+os_timer_t timer;
 
 void setup(void) {
   Serial.begin(115200);
@@ -73,9 +80,14 @@ void loop(void) {
     }
   } else if (currentState == DOOR_CLOSED_AND_UNLOCKED){
     String nfcID = checkNFC();
+    if (isValidID(nfcID)) {
+      unlockDoor();
+      restartUnlockTimeout();
+    }
   }
   // Wait 1 second before continuing
   delay(1000);
+  yield();
 }
 
 String checkNFC() {
@@ -143,14 +155,28 @@ bool isValidID(String nfcID) {
 }
 
 void lockDoor() {
-
+  Serial.println("Locking door.");
 }
 
 void unlockDoor() {
-
+  Serial.println("Unlocking door.");
 }
 
 void startUnlockTimeout() {
+  os_timer_setfn(&timer, unlockTimeoutCallback, NULL);
+  os_timer_arm(&timer, 10000, false);
+  Serial.println("Door unlock timer started.");
+}
 
+void restartUnlockTimeout() {
+  os_timer_disarm(&timer);
+  os_timer_arm(&timer, 10000, false);
+  Serial.println("Door unlock timer restarted.");
+}
+
+void unlockTimeoutCallback(void *pArg) {
+  Serial.println("Door unlock timeout elapsed.");
+  lockDoor();
+  currentState = DOOR_CLOSED_AND_LOCKED;
 }
 
