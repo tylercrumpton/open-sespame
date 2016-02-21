@@ -22,6 +22,17 @@
 #define PN532_SS   (D4)
 Adafruit_PN532 nfc(PN532_SS);
 
+// Define states for state machine:
+enum doorStates {
+  DOOR_CLOSED_AND_LOCKED,
+  DOOR_CLOSED_AND_UNLOCKED,
+  DOOR_OPEN_AND_UNLOCKED,
+  DOOR_RECLOSED_AND_UNLOCKED,
+  UNKNOWN
+};
+
+doorStates currentState = UNKNOWN;
+
 void setup(void) {
   Serial.begin(115200);
   Serial.println("Hello!");
