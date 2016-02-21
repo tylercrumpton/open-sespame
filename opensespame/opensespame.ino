@@ -37,6 +37,8 @@ void setup(void) {
   Serial.begin(115200);
   Serial.println("Booting open-sespame...");
 
+  determineCurrentState();
+
   nfc.begin();
 
   uint32_t versiondata = nfc.getFirmwareVersion();
@@ -107,5 +109,27 @@ String hexlify(uint8_t byte) {
   }
 
   return hexedString;
+}
+
+void determineCurrentState() {
+  if (isDoorClosed()) {
+    lockDoor();
+    currentState = DOOR_CLOSED_AND_LOCKED;
+  } else {
+    unlockDoor();
+    currentState = DOOR_OPEN_AND_UNLOCKED;
+  }
+}
+
+bool isDoorClosed() {
+  return true;
+}
+
+void lockDoor() {
+
+}
+
+void unlockDoor() {
+
 }
 
