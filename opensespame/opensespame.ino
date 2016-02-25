@@ -33,6 +33,10 @@ extern void relockTimeoutCallback(void *pArg);
 extern void doorChanged();
 extern void doorOpened();
 extern void doorClosed();
+extern void connectToWiFi();
+extern void connectToMQTT();
+extern void scheduleMessage(String message);
+extern void sendMessages();
 
 // Connect to the PN532 using a hardware SPI connection. 
 // Pins need to be connected as follows:
@@ -46,6 +50,15 @@ extern void doorClosed();
 #define PN532_SS   (D4)
 Adafruit_PN532 nfc(PN532_SS);
 
+const char *ssid = "myssid";
+const char *pass = "mypass";
+const char *mqttHost = "test.mosquitto.org";
+const int mqttPort = 1883;
+const char *mqttTopic = "myhouse/door/front";
+
+WiFiClient wclient;
+PubSubClient client(wclient, mqttHost, mqttPort);
+
 // Define states for state machine:
 enum doorStates {
   DOOR_CLOSED_AND_LOCKED,
@@ -57,6 +70,9 @@ enum doorStates {
 
 doorStates currentState = UNKNOWN;
 
+String scheduledMessages[8];
+int numScheduledMessages = 0;
+
 // Define a timer to use for timeouts:
 os_timer_t timer;
 
@@ -64,11 +80,16 @@ void setup(void) {
   Serial.begin(115200);
   Serial.println("Booting open-sespame...");
 
+  scheduleMessage("booted");
+
   determineCurrentState();
 
   // Enable GPIO interrupts:
   pinMode(D3, INPUT);
   attachInterrupt(D3, doorChanged, CHANGE);
+
+  // Connect to WiFi:
+  connectToWiFi();
 
   nfc.begin();
 
@@ -109,6 +130,7 @@ void loop(void) {
       restartUnlockTimeout();
     }
   }
+  sendMessages();
   // Wait 1 second before continuing
   delay(1000);
   yield();
@@ -135,6 +157,7 @@ String checkNFC() {
       strUID += hexlify(uid[i]);
     }
     Serial.println("");
+    scheduleMessage("scan=" + strUID);
   }
   else
   {
@@ -174,16 +197,19 @@ bool isValidID(String nfcID) {
   bool isValid = false;
   if (nfcID != "") {
     isValid = true;
+    scheduleMessage("user=tylercrumpton");
   }
   return isValid;
 }
 
 void lockDoor() {
   Serial.println("Locking door.");
+  scheduleMessage("locked");
 }
 
 void unlockDoor() {
   Serial.println("Unlocking door.");
+  scheduleMessage("unlocked");
 }
 
 void startUnlockTimeout() {
@@ -239,6 +265,7 @@ void doorOpened() {
   } else if (currentState == DOOR_RECLOSED_AND_UNLOCKED) {
     restartRelockTimeout();
   }
+  scheduleMessage("opened");
 }
 
 void doorClosed() {
@@ -247,5 +274,46 @@ void doorClosed() {
     currentState = DOOR_RECLOSED_AND_UNLOCKED;
     startRelockTimeout();
   }
+  scheduleMessage("closed");
+}
+
+void connectToWiFi() {
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.print("Connecting to ");
+    Serial.print(ssid);
+    Serial.println("...");
+    WiFi.begin(ssid, pass);
+
+    if (WiFi.waitForConnectResult() != WL_CONNECTED)
+      return;
+    Serial.println("WiFi connected");
+  } else {
+    Serial.println("WiFi already connected!");
+  }
+}
+
+void connectToMQTT() {
+  if (!client.connected()) {
+      if (client.connect("doorClient")) {
+        Serial.println("MQTT connected.");
+      } else {
+        Serial.println("MQTT failed to connect.");
+      }
+  }
+}
+
+void scheduleMessage(String message) {
+  if (numScheduledMessages <= 8) {
+    ++numScheduledMessages;
+    scheduledMessages[numScheduledMessages-1] = message;
+  }
+}
+
+void sendMessages() {
+  for (int i=1; i<=numScheduledMessages; ++i) {
+    connectToMQTT();
+    client.publish(mqttTopic, scheduledMessages[i-1]);
+  }
+  numScheduledMessages = 0;
 }
 
