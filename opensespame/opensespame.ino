@@ -35,7 +35,7 @@ extern void doorOpened();
 extern void doorClosed();
 extern void connectToWiFi();
 extern void connectToMQTT();
-extern void scheduleMessage(String message);
+extern void scheduleMessage(String subTopic, String message);
 extern void sendMessages();
 
 // Connect to the PN532 using a hardware SPI connection. 
@@ -70,7 +70,7 @@ enum doorStates {
 
 doorStates currentState = UNKNOWN;
 
-String scheduledMessages[8];
+String scheduledMessages[8][2];
 int numScheduledMessages = 0;
 
 // Define a timer to use for timeouts:
@@ -80,7 +80,7 @@ void setup(void) {
   Serial.begin(115200);
   Serial.println("Booting open-sespame...");
 
-  scheduleMessage("booted");
+  scheduleMessage("/device", "{\"status\":\"booted\"}");
 
   determineCurrentState();
 
@@ -157,7 +157,6 @@ String checkNFC() {
       strUID += hexlify(uid[i]);
     }
     Serial.println("");
-    scheduleMessage("scan=" + strUID);
   }
   else
   {
@@ -197,19 +196,20 @@ bool isValidID(String nfcID) {
   bool isValid = false;
   if (nfcID != "") {
     isValid = true;
-    scheduleMessage("user=tylercrumpton");
-  }
+    String user = "tylercrumpton";
+    scheduleMessage("/user", "{\"valid\":true,\"user\":\"" + user + "\",\"method\":\"nfc\"}");
+  } 
   return isValid;
 }
 
 void lockDoor() {
   Serial.println("Locking door.");
-  scheduleMessage("locked");
+  scheduleMessage("/lock", "{\"status\":\"locked\"}");
 }
 
 void unlockDoor() {
   Serial.println("Unlocking door.");
-  scheduleMessage("unlocked");
+  scheduleMessage("/lock", "{\"status\":\"unlocked\"}");
 }
 
 void startUnlockTimeout() {
@@ -265,7 +265,7 @@ void doorOpened() {
   } else if (currentState == DOOR_RECLOSED_AND_UNLOCKED) {
     restartRelockTimeout();
   }
-  scheduleMessage("opened");
+  scheduleMessage("/doorsensor", "{\"status\":\"open\"}");
 }
 
 void doorClosed() {
@@ -274,7 +274,7 @@ void doorClosed() {
     currentState = DOOR_RECLOSED_AND_UNLOCKED;
     startRelockTimeout();
   }
-  scheduleMessage("closed");
+  scheduleMessage("/doorsensor", "{\"status\":\"closed\"}");
 }
 
 void connectToWiFi() {
@@ -302,17 +302,18 @@ void connectToMQTT() {
   }
 }
 
-void scheduleMessage(String message) {
+void scheduleMessage(String subTopic, String message) {
   if (numScheduledMessages <= 8) {
     ++numScheduledMessages;
-    scheduledMessages[numScheduledMessages-1] = message;
+    scheduledMessages[numScheduledMessages-1][0] = message;
+    scheduledMessages[numScheduledMessages-1][1] = subTopic;
   }
 }
 
 void sendMessages() {
   for (int i=1; i<=numScheduledMessages; ++i) {
     connectToMQTT();
-    client.publish(mqttTopic, scheduledMessages[i-1]);
+    client.publish(mqttTopic+scheduledMessages[i-1][1], scheduledMessages[i-1][0]);
   }
   numScheduledMessages = 0;
 }
