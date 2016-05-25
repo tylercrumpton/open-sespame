@@ -57,7 +57,7 @@ const int mqttPort = 1883;
 const char *mqttTopic = "myhouse/door/front";
 
 WiFiClient wclient;
-PubSubClient client(wclient, mqttHost, mqttPort);
+PubSubClient client(wclient);
 
 // Define states for state machine:
 enum doorStates {
@@ -77,6 +77,8 @@ int numScheduledMessages = 0;
 os_timer_t timer;
 
 void setup(void) {
+  client.setServer(mqttHost, mqttPort);
+
   Serial.begin(115200);
   Serial.println("Booting open-sespame...");
 
@@ -313,7 +315,9 @@ void scheduleMessage(String subTopic, String message) {
 void sendMessages() {
   for (int i=1; i<=numScheduledMessages; ++i) {
     connectToMQTT();
-    client.publish(mqttTopic+scheduledMessages[i-1][1], scheduledMessages[i-1][0]);
+    String message = mqttTopic+scheduledMessages[i-1][1];
+    String topic = scheduledMessages[i-1][0].c_str();
+    client.publish(message.c_str(), topic.c_str());
   }
   numScheduledMessages = 0;
 }
