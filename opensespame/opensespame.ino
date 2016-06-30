@@ -129,7 +129,7 @@ void setup(void) {
   Serial.begin(115200);
   Serial.println("Booting open-sespame...");
 
-  Serial.println("Max packet size: " + MQTT_MAX_PACKET_SIZE);
+  Serial.print("Max packet size: "); Serial.println(MQTT_MAX_PACKET_SIZE);
 
   scheduleMessage("/device", "{\"status\":\"booted\"}");
 
