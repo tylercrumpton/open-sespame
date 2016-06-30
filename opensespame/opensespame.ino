@@ -200,8 +200,6 @@ void loop(void) {
   }
 
   sendMessages();
-  // Wait 1 second before continuing
-  //delay(500);
   yield();
   client.loop();
   server.handleClient();
@@ -322,7 +320,7 @@ void unlockDoor() {
   Serial.println("Unlocking door.");
   scheduleMessage("/lock", "{\"status\":\"unlocked\"}");
   digitalWrite(IO_DOOR_UNLOCK, HIGH);
-  delay(500);
+  delay(100);
   digitalWrite(IO_DOOR_UNLOCK, LOW);
 }
 
