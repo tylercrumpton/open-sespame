@@ -11,6 +11,9 @@
 #include <Adafruit_PN532.h>
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
+#include <Hash.h>
+#include <ESP8266WebServer.h>
+#include <FS.h>
 
 extern "C" {
 #include "user_interface.h"
@@ -59,6 +62,48 @@ const char *mqttTopic = "myhouse/door/front";
 WiFiClient wclient;
 PubSubClient client(wclient);
 
+ESP8266WebServer server(80);
+
+void handleRoot() {
+  server.send(200, "text/plain", "Hi there! You found the open-sESPame device! Congrats! You should buy yourself a cookie!");
+}
+
+void returnOK() {
+  server.send(200, "text/plain", "");
+}
+
+void handleFileUpload(){
+  if(server.uri() != "/upload") return;
+  String csvData = server.arg(0);
+  Serial.print(server.argName(0));
+  Serial.print(": ");
+  Serial.println(csvData);
+
+  File csvFile = SPIFFS.open("/nfc_ids.csv", "w");
+
+  unsigned char* csvBytes = (unsigned char*) csvData.c_str();
+
+  csvFile.write(csvBytes, csvData.length());
+  csvFile.close();
+
+  returnOK();
+}
+
+void handleNotFound(){
+  String message = "File Not Found\n\n";
+  message += "URI: ";
+  message += server.uri();
+  message += "\nMethod: ";
+  message += (server.method() == HTTP_GET)?"GET":"POST";
+  message += "\nArguments: ";
+  message += server.args();
+  message += "\n";
+  for (uint8_t i=0; i<server.args(); i++){
+    message += " " + server.argName(i) + ": " + server.arg(i) + "\n";
+  }
+  server.send(404, "text/plain", message);
+}
+
 // Define states for state machine:
 enum doorStates {
   DOOR_CLOSED_AND_LOCKED,
@@ -77,10 +122,14 @@ int numScheduledMessages = 0;
 os_timer_t timer;
 
 void setup(void) {
+  SPIFFS.begin();
+
   client.setServer(mqttHost, mqttPort);
 
   Serial.begin(115200);
   Serial.println("Booting open-sespame...");
+
+  Serial.println("Max packet size: " + MQTT_MAX_PACKET_SIZE);
 
   scheduleMessage("/device", "{\"status\":\"booted\"}");
 
@@ -90,8 +139,16 @@ void setup(void) {
   pinMode(D3, INPUT);
   attachInterrupt(D3, doorChanged, CHANGE);
 
+  pinMode(D1, OUTPUT);
+
   // Connect to WiFi:
   connectToWiFi();
+
+  server.on("/", handleRoot);
+  server.on("/upload", HTTP_POST, handleFileUpload);
+  server.onNotFound(handleNotFound);
+
+  server.begin();
 
   nfc.begin();
 
@@ -134,8 +191,10 @@ void loop(void) {
   }
   sendMessages();
   // Wait 1 second before continuing
-  delay(1000);
+  //delay(500);
   yield();
+  client.loop();
+  server.handleClient();
 }
 
 String checkNFC() {
@@ -191,15 +250,48 @@ void determineCurrentState() {
 }
 
 bool isDoorClosed() {
-  return true;
+  return false;
+}
+
+bool isStringInString(String needle, String haystack) {
+  for (int i = 0; i <= haystack.length() - needle.length(); i++) {
+    if (haystack.substring(i, needle.length() + i) == needle) {
+      return true;
+    }
+  }
+  return false;
 }
 
 bool isValidID(String nfcID) {
   bool isValid = false;
   if (nfcID != "") {
-    isValid = true;
-    String user = "tylercrumpton";
-    scheduleMessage("/user", "{\"valid\":true,\"user\":\"" + user + "\",\"method\":\"nfc\"}");
+    Serial.print("SHA:");
+
+    String shaID = sha1(nfcID);
+
+    Serial.println(shaID);
+
+    File file = SPIFFS.open("/nfc_ids.csv", "r");
+
+    if (!file) {
+        Serial.println("File open failed.");
+        scheduleMessage("/error", "{\"error\":\"NFC_FILE_OPEN_ERROR\",\"message\":\"NFC CSV file open failed.\"}");
+        return false;
+    }
+    //for (int i=1; i<=19; i++){
+    while (file.available()) {
+      String s=file.readStringUntil('\n');
+      if (isStringInString(shaID, s)) {
+        isValid = true;
+        String user = s.substring(0, s.indexOf(','));
+        scheduleMessage("/user", "{\"valid\":true,\"user\":\"" + user + "\",\"method\":\"nfc\",\"hashedId\":\"" + shaID + "\"}");
+      }
+    }
+
+    if (!isValid) {
+      scheduleMessage("/error", "{\"error\":\"NO_USER_FOR_NFC\",\"message\":\"No user found for NFC ID.\",\"hashedId\":\"" + shaID + "\"}");
+    }
+    file.close();
   } 
   return isValid;
 }
@@ -212,6 +304,9 @@ void lockDoor() {
 void unlockDoor() {
   Serial.println("Unlocking door.");
   scheduleMessage("/lock", "{\"status\":\"unlocked\"}");
+  digitalWrite(D1, HIGH);
+  delay(100);
+  digitalWrite(D1, LOW);
 }
 
 void startUnlockTimeout() {
@@ -288,7 +383,8 @@ void connectToWiFi() {
 
     if (WiFi.waitForConnectResult() != WL_CONNECTED)
       return;
-    Serial.println("WiFi connected");
+    Serial.print("WiFi connected; IP: ");
+    Serial.println(WiFi.localIP());
   } else {
     Serial.println("WiFi already connected!");
   }
