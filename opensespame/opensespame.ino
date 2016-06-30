@@ -135,13 +135,15 @@ void setup(void) {
 
   scheduleMessage("/device", "{\"status\":\"booted\"}");
 
-  determineCurrentState();
-
   // Enable GPIO interrupts:
   pinMode(IO_DOOR_SENSOR, INPUT);
   attachInterrupt(IO_DOOR_SENSOR, doorChanged, CHANGE);
+  Serial.print("Door sensor on pin "); Serial.println(IO_DOOR_SENSOR);
 
   pinMode(IO_DOOR_UNLOCK, OUTPUT);
+  Serial.print("Door unlock on pin "); Serial.println(IO_DOOR_UNLOCK);
+
+  determineCurrentState();
 
   // Connect to WiFi:
   connectToWiFi();
