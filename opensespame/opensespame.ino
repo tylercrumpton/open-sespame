@@ -51,9 +51,11 @@ extern bool isNFCReaderPresent();
 //   MISO <---> D6
 //    SCK <---> D5
 //     SS <---> D4
+#define IO_DOOR_SENSOR  (D0)
+#define IO_DOOR_UNLOCK  (D1)
+#define IO_PN532_SS     (D4)
 
-#define PN532_SS   (D4)
-Adafruit_PN532 nfc(PN532_SS);
+Adafruit_PN532 nfc(IO_PN532_SS);
 
 #include "config.h"
 
@@ -136,10 +138,10 @@ void setup(void) {
   determineCurrentState();
 
   // Enable GPIO interrupts:
-  pinMode(D3, INPUT);
-  attachInterrupt(D3, doorChanged, CHANGE);
+  pinMode(IO_DOOR_SENSOR, INPUT);
+  attachInterrupt(IO_DOOR_SENSOR, doorChanged, CHANGE);
 
-  pinMode(D1, OUTPUT);
+  pinMode(IO_DOOR_UNLOCK, OUTPUT);
 
   // Connect to WiFi:
   connectToWiFi();
@@ -317,9 +319,9 @@ void lockDoor() {
 void unlockDoor() {
   Serial.println("Unlocking door.");
   scheduleMessage("/lock", "{\"status\":\"unlocked\"}");
-  digitalWrite(D1, HIGH);
-  delay(100);
-  digitalWrite(D1, LOW);
+  digitalWrite(IO_DOOR_UNLOCK, HIGH);
+  delay(500);
+  digitalWrite(IO_DOOR_UNLOCK, LOW);
 }
 
 void startUnlockTimeout() {
@@ -359,7 +361,7 @@ void relockTimeoutCallback(void *pArg) {
 }
 
 void doorChanged() {
-  bool status = digitalRead(D3);
+  bool status = digitalRead(IO_DOOR_SENSOR);
   if (status) {
     doorClosed();
   } else {
