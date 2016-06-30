@@ -40,6 +40,8 @@ extern void connectToWiFi();
 extern void connectToMQTT();
 extern void scheduleMessage(String subTopic, String message);
 extern void sendMessages();
+extern bool initializeNFCReader();
+extern bool isNFCReaderPresent();
 
 // Connect to the PN532 using a hardware SPI connection. 
 // Pins need to be connected as follows:
@@ -111,6 +113,8 @@ enum doorStates {
 
 doorStates currentState = UNKNOWN;
 
+bool nfcReaderInitialized = false;
+
 String scheduledMessages[8][2];
 int numScheduledMessages = 0;
 
@@ -147,47 +151,50 @@ void setup(void) {
   server.begin();
 
   nfc.begin();
-  Serial.println("Starting NFC...");
-
-  uint32_t versiondata = nfc.getFirmwareVersion();
-  if (! versiondata) {
-    Serial.println("Didn't find PN53x board");
-    Serial.println("NFC init failed!");
-    //while (1); // halt
+  Serial.println("Initializing NFC reader...");
+  if ( initializeNFCReader() ) {
+    nfcReaderInitialized = true;
+    Serial.println("NFC reader initialized.");
   } else {
-    // Got ok data, print it out!
-    Serial.print("Found chip PN5"); Serial.println((versiondata>>24) & 0xFF, HEX); 
-    Serial.print("Firmware ver. "); Serial.print((versiondata>>16) & 0xFF, DEC); 
-    Serial.print('.'); Serial.println((versiondata>>8) & 0xFF, DEC);
-    
-    // Set the max number of retry attempts to read from a card
-    // This prevents us from waiting forever for a card, which is
-    // the default behaviour of the PN532.
-    nfc.setPassiveActivationRetries(0xFE);
-    
-    // configure board to read RFID tags
-    nfc.SAMConfig();
-    
-    Serial.println("NFC init done.");
+    nfcReaderInitialized = false;
+    Serial.println("No dice. Continuing anyway. Will try to reinit later.");
   }
+
+  Serial.println("boot done.");
   
 }
 
 void loop(void) {
-  if (currentState == DOOR_CLOSED_AND_LOCKED) {
-    String nfcID = checkNFC();
-    if (isValidID(nfcID)) {
-      unlockDoor();
-      startUnlockTimeout();
-      currentState = DOOR_CLOSED_AND_UNLOCKED;
-    }
-  } else if (currentState == DOOR_CLOSED_AND_UNLOCKED){
-    String nfcID = checkNFC();
-    if (isValidID(nfcID)) {
-      unlockDoor();
-      restartUnlockTimeout();
-    }
+  if ( isNFCReaderPresent() ) {
+    if ( ! nfcReaderInitialized ) {
+      //it's back! reinitialize it
+      Serial.println("NFC reader is back!");
+      nfcReaderInitialized = initializeNFCReader();
+    } //end if-initialized
+    //so now it's here and it's also initialized. check for tags
+    if (currentState == DOOR_CLOSED_AND_LOCKED) {
+      String nfcID = checkNFC();
+      if (isValidID(nfcID)) {
+        unlockDoor();
+        startUnlockTimeout();
+        currentState = DOOR_CLOSED_AND_UNLOCKED;
+      } //end if-valid
+    } else if (currentState == DOOR_CLOSED_AND_UNLOCKED) {
+      String nfcID = checkNFC();
+      if (isValidID(nfcID)) {
+        unlockDoor();
+        restartUnlockTimeout();
+      } //end if-valid
+    } //end if-closed-and-unlocked
+  } else {
+    //The reader is not present, so obviously it is not initialized.
+    nfcReaderInitialized = false;
+    Serial.println("Not checking for tags because NFC reader isn't here.");
+    //you would think we would want a delay here.
+    //but actually checking for the NFC reader when it is not present takes like, almost a second.
+    //so whatever
   }
+
   sendMessages();
   // Wait 1 second before continuing
   //delay(500);
@@ -380,8 +387,11 @@ void connectToWiFi() {
     Serial.println("...");
     WiFi.begin(ssid, pass);
 
-    if (WiFi.waitForConnectResult() != WL_CONNECTED)
+    if (WiFi.waitForConnectResult() != WL_CONNECTED) {
+      Serial.println("Connection not successful.");
       return;
+    }
+    
     Serial.print("WiFi connected; IP: ");
     Serial.println(WiFi.localIP());
   } else {
@@ -415,5 +425,36 @@ void sendMessages() {
     client.publish(message.c_str(), topic.c_str());
   }
   numScheduledMessages = 0;
+}
+
+bool initializeNFCReader() {
+  Serial.println("Starting NFC...");
+  if ( ! isNFCReaderPresent() ) {
+    Serial.println("Didn't find PN53x board");
+    Serial.println("NFC init failed!");
+  } else {
+    // Set the max number of retry attempts to read from a card
+    // This prevents us from waiting forever for a card, which is
+    // the default behaviour of the PN532.
+    nfc.setPassiveActivationRetries(0xFE);
+    
+    // configure board to read RFID tags
+    nfc.SAMConfig();
+    
+    Serial.println("NFC init done.");
+    return true;
+  }
+  return false;
+}
+
+bool isNFCReaderPresent() {
+  uint32_t versiondata = nfc.getFirmwareVersion();
+  if ( versiondata ) {
+    //Serial.print("Found chip PN5"); Serial.println((versiondata>>24) & 0xFF, HEX); 
+    //Serial.print("Firmware ver. "); Serial.print((versiondata>>16) & 0xFF, DEC); 
+    //Serial.print('.'); Serial.println((versiondata>>8) & 0xFF, DEC);
+    return true;
+  }
+  return false;
 }
 
