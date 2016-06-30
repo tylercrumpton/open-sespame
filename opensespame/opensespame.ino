@@ -256,7 +256,14 @@ void determineCurrentState() {
 }
 
 bool isDoorClosed() {
-  return true;
+  switch (currentState) {
+    case DOOR_CLOSED_AND_LOCKED:
+    case DOOR_CLOSED_AND_UNLOCKED:
+    case DOOR_RECLOSED_AND_UNLOCKED:
+      return true;
+    default:
+      return false;
+  }
 }
 
 bool isStringInString(String needle, String haystack) {
