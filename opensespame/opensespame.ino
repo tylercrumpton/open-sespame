@@ -37,7 +37,7 @@ extern void doorChanged();
 extern void doorOpened();
 extern void doorClosed();
 extern void connectToWiFi();
-extern void connectToMQTT();
+extern bool connectToMQTT();
 extern void scheduleMessage(String subTopic, String message);
 extern void sendMessages();
 extern bool initializeNFCReader();
@@ -51,7 +51,7 @@ extern bool isNFCReaderPresent();
 //   MISO <---> D6
 //    SCK <---> D5
 //     SS <---> D4
-#define IO_DOOR_SENSOR  (D0)
+#define IO_DOOR_SENSOR  (D2)
 #define IO_DOOR_UNLOCK  (D1)
 #define IO_PN532_SS     (D4)
 
@@ -408,14 +408,14 @@ void connectToWiFi() {
   }
 }
 
-void connectToMQTT() {
-  if (!client.connected()) {
-      if (client.connect("doorClient")) {
-        Serial.println("MQTT connected.");
-      } else {
-        Serial.println("MQTT failed to connect.");
-      }
+bool connectToMQTT() {
+  if (client.connect("doorClient")) {
+    Serial.println("MQTT connected.");
+    return true;
+  } else {
+    Serial.println("MQTT failed to connect.");
   }
+  return false;
 }
 
 void scheduleMessage(String subTopic, String message) {
@@ -427,13 +427,17 @@ void scheduleMessage(String subTopic, String message) {
 }
 
 void sendMessages() {
-  for (int i=1; i<=numScheduledMessages; ++i) {
-    connectToMQTT();
-    String message = mqttTopic+scheduledMessages[i-1][1];
-    String topic = scheduledMessages[i-1][0].c_str();
-    client.publish(message.c_str(), topic.c_str());
+  if ( client.connected() || connectToMQTT() ) { //if we are already connected or we are able to reconnect
+    //then send the messages.
+    for (int i=1; i<=numScheduledMessages; ++i) {
+      String message = mqttTopic+scheduledMessages[i-1][1];
+      String topic = scheduledMessages[i-1][0].c_str();
+      client.publish(message.c_str(), topic.c_str());
+    }
+    numScheduledMessages = 0; //we might lose some messages here if we disconnect while sending messages. but eh.
+  } else {
+    Serial.println("Not sending messages as MQTT is unavailable.");
   }
-  numScheduledMessages = 0;
 }
 
 bool initializeNFCReader() {
