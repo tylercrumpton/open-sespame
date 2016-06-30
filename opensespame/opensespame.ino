@@ -53,11 +53,7 @@ extern void sendMessages();
 #define PN532_SS   (D4)
 Adafruit_PN532 nfc(PN532_SS);
 
-const char *ssid = "myssid";
-const char *pass = "mypass";
-const char *mqttHost = "test.mosquitto.org";
-const int mqttPort = 1883;
-const char *mqttTopic = "myhouse/door/front";
+#include "config.h"
 
 WiFiClient wclient;
 PubSubClient client(wclient);
