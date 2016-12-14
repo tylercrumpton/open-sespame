@@ -8,6 +8,7 @@
  */ 
 /**************************************************************************/
 #include <SPI.h>
+#include <Wire.h>
 #include <Adafruit_PN532.h>
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
